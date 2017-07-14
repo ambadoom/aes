@@ -23,6 +23,7 @@ fn gf_multiply_test() {
     assert_eq!(0x04, gf_multiply(0x02, 0x02));
 }
 
+#[allow(dead_code)]
 fn generate_sbox() -> [u8; 256] {
     let inv3: u8 = 0xf6;
     let mut up: u8 = 1;
@@ -44,6 +45,7 @@ fn generate_sbox() -> [u8; 256] {
     outbox
 }
 
+#[allow(dead_code)]
 fn invert_sbox(inbox: &[u8; 256]) -> [u8; 256] {
     let mut outbox = [0; 256];
     for (i, v) in inbox.iter().enumerate() {
