@@ -1,0 +1,6 @@
+[package]
+name = "aes"
+version = "0.1.0"
+authors = ["lxs623 <lxs623@student.bham.ac.uk>"]
+
+[dependencies]
