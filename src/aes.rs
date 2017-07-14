@@ -133,7 +133,7 @@ fn expand_key_128(key: [u8; 16]) -> [u8; 176] {
     expanded
 }
 
-fn encrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
+pub fn encrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     let mut state = block;
     let ekey = expand_key_128(key);
     add_round_key(&mut state, &ekey[0..16]);
@@ -194,7 +194,7 @@ fn encrypt_test() {
     assert_eq!(plain, reverse);
 }
  
-fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
+pub fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     let mut state = block;
     let ekey = expand_key_128(key);
     add_round_key(&mut state, &ekey[10*16 .. 11*16]);
