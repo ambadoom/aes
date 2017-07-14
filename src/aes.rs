@@ -44,7 +44,7 @@ fn generate_sbox() -> [u8; 256] {
     sbox
 }
 
-fn invert_sbox(inbox: [u8; 256]) -> [u8; 256] {
+fn invert_sbox(inbox: &[u8; 256]) -> [u8; 256] {
     let mut outbox = [0; 256];
     for (i, v) in inbox.iter().enumerate() {
         outbox[*v as usize] = i as u8;
@@ -82,7 +82,7 @@ fn schedule_core(bytes: &mut [u8; 4], iterations: u8, sbox: &[u8; 256]) {
     }
     bytes[3] = sbox[fst as usize];
     let mut rcon = 1;
-    for i in _..iterations {
+    for _ in 1..iterations {
         rcon = gf_multiply(rcon, 2);
     }
     bytes[0] ^= rcon; 
@@ -126,7 +126,7 @@ fn encrypt_128(key: [u8; 16], block: [u8; 16], sbox: &[u8; 256]) -> [u8; 16] {
     }
     sub_bytes(&mut state, sbox);
     shift_rows(&mut state);
-    add_round_key(&mut state, &ekey[10*16 .. 11 * 16]);
+    add_round_key(&mut state, &ekey[10*16 .. 11*16]);
     state
 }
 
@@ -171,6 +171,46 @@ fn encrypt_test() {
     let expected = [0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30, 0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a];
     let actual = encrypt_128(key, plain, &generate_sbox());
     assert_eq!(expected, actual);
+    let reverse = decrypt_128(key, expected, &generate_sbox());
+    assert_eq!(plain, reverse);
 }
  
+fn decrypt_128(key: [u8; 16], block: [u8; 16], sbox: &[u8; 256]) -> [u8; 16] {
+    let mut state = block;
+    let invbox = &invert_sbox(sbox);
+    let ekey = expand_key_128(key, sbox);
+    add_round_key(&mut state, &ekey[10*16 .. 11*16]);
+    for round in (1..10).rev() {
+        inv_shift_rows(&mut state);
+        sub_bytes(&mut state, invbox);
+        add_round_key(&mut state, &ekey[round*16 .. (round+1) * 16]);
+        inv_mix_columns(&mut state);
+    }
+    inv_shift_rows(&mut state);
+    sub_bytes(&mut state, invbox);
+    add_round_key(&mut state, &ekey[0..16]);
+    state
+}
 
+fn inv_shift_rows(state: &mut [u8; 16]) {
+    let copy = state.clone();
+    for i in 0..16 {
+        let row = i % 4;
+        let col = i / 4;
+        let target = (4 + col - row) % 4;
+        state[i] = copy[target * 4 + row];
+    }
+}
+
+fn inv_mix_columns(state: &mut [u8; 16]) {
+    for i in 0..4 {
+        let b0 = state[4*i+0];
+        let b1 = state[4*i+1];
+        let b2 = state[4*i+2];
+        let b3 = state[4*i+3];
+        state[4*i+0] = gf_multiply(14, b0) ^ gf_multiply(11, b1) ^ gf_multiply(13, b2) ^ gf_multiply(9, b3);
+        state[4*i+1] = gf_multiply(9, b0) ^ gf_multiply(14, b1) ^ gf_multiply(11, b2) ^ gf_multiply(13, b3);
+        state[4*i+2] = gf_multiply(13, b0) ^ gf_multiply(9, b1) ^ gf_multiply(14, b2) ^ gf_multiply(11, b3);
+        state[4*i+3] = gf_multiply(11, b0) ^ gf_multiply(13, b1) ^ gf_multiply(9, b2) ^ gf_multiply(14, b3);
+    }
+}
