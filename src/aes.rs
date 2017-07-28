@@ -23,36 +23,6 @@ fn gf_multiply_test() {
     assert_eq!(0x04, gf_multiply(0x02, 0x02));
 }
 
-#[allow(dead_code)]
-fn generate_sbox() -> [u8; 256] {
-    let inv3: u8 = 0xf6;
-    let mut up: u8 = 1;
-    let mut down: u8 = 1;
-    let mut outbox = [0; 256];
-
-    while up != 1 || outbox[1] == 0 {
-        up = gf_multiply(up, 0x03);
-        down = gf_multiply(down, inv3);
-        let mut value = down;
-        value ^= down.rotate_left(1);
-        value ^= down.rotate_left(2);
-        value ^= down.rotate_left(3);
-        value ^= down.rotate_left(4);
-        value ^= 0x63;
-        outbox[up as usize] = value;
-    }
-    outbox[0] = 0x63;
-    outbox
-}
-
-#[allow(dead_code)]
-fn invert_sbox(inbox: &[u8; 256]) -> [u8; 256] {
-    let mut outbox = [0; 256];
-    for (i, v) in inbox.iter().enumerate() {
-        outbox[*v as usize] = i as u8;
-    }
-    outbox
-}
 
 const SBOX: [u8; 256] = 
     [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76
@@ -90,6 +60,36 @@ const INVBOX: [u8; 256] =
     ,0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61
     ,0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D];
 
+#[allow(dead_code)]
+fn generate_sbox() -> [u8; 256] {
+    let inv3: u8 = 0xf6;
+    let mut up: u8 = 1;
+    let mut down: u8 = 1;
+    let mut outbox = [0; 256];
+
+    while up != 1 || outbox[1] == 0 {
+        up = gf_multiply(up, 0x03);
+        down = gf_multiply(down, inv3);
+        let mut value = down;
+        value ^= down.rotate_left(1);
+        value ^= down.rotate_left(2);
+        value ^= down.rotate_left(3);
+        value ^= down.rotate_left(4);
+        value ^= 0x63;
+        outbox[up as usize] = value;
+    }
+    outbox[0] = 0x63;
+    outbox
+}
+
+#[allow(dead_code)]
+fn invert_sbox(inbox: &[u8; 256]) -> [u8; 256] {
+    let mut outbox = [0; 256];
+    for (i, v) in inbox.iter().enumerate() {
+        outbox[*v as usize] = i as u8;
+    }
+    outbox
+}
 #[test]
 fn generate_sbox_test() {
     assert_eq!(SBOX[..], generate_sbox()[..]);
@@ -109,35 +109,63 @@ fn schedule_core(bytes: &mut [u8; 4], iterations: u8) {
     bytes[0] ^= rcon; 
 }
     
-
-fn expand_key_128(key: [u8; 16]) -> [u8; 176] {
+fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
+    let insize = key.len();
+    let outsize = match insize {
+        16 => 176,
+        24 => 208,
+        32 => 240,
+        _  => return Err("Invalid key size"),
+    };
     let mut tmp = [0; 4];
-    let mut count = 16;
     let mut iterations = 1;
-    let mut expanded: [u8; 176] = [0; 176];
-    for (index, byte) in key.iter().enumerate() {
-        expanded[index] = *byte;
+    let mut expanded: Vec<u8> = Vec::with_capacity(outsize);
+    for byte in key.iter() {
+        expanded.push(*byte);
     }
+    let pull_tmp = |tmp: &mut [u8;4], expanded: &Vec<u8>| {
+        for i in 0..4 {
+            let pos = expanded.len();
+            tmp[i] = expanded[pos + i - 4];
+        }
+    };
+    let push_tmp = |tmp: &[u8;4], expanded: &mut Vec<u8>| {
+        for i in 0..4 {
+            let pos = expanded.len();
+            let elem = expanded[pos-insize] ^ tmp[i];
+            expanded.push(elem);
+        }
+    };
 
-    while count < 176 {
-        for i in 0..4 {
-            tmp[i] = expanded[count + i - 4];
+    while expanded.len() < outsize {
+        pull_tmp(&mut tmp, &expanded);
+        schedule_core(&mut tmp, iterations);
+        iterations += 1;
+        push_tmp(&tmp, &mut expanded);
+        for _ in 0..3 {
+            pull_tmp(&mut tmp, &expanded);
+            push_tmp(&tmp, &mut expanded);
         }
-        if count % 16 == 0 {
-            schedule_core(&mut tmp, iterations);
-            iterations += 1;
+        if insize == 32 {
+            pull_tmp(&mut tmp, &expanded);
+            for i in 0..4 {
+                tmp[i] = SBOX[tmp[i] as usize];
+            }
+            push_tmp(&tmp, &mut expanded);
         }
-        for i in 0..4 {
-            expanded[count] = expanded[count-16] ^ tmp[i];
-            count += 1;
+        let steps = match insize { 24 => 2, 32 => 3, _ => 0 };
+        for _ in 0..steps {
+            pull_tmp(&mut tmp, &expanded);
+            push_tmp(&tmp, &mut expanded);
         }
     }
-    expanded
+    Ok(expanded)
 }
+
 
 pub fn encrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     let mut state = block;
-    let ekey = expand_key_128(key);
+    let ekey = expand_key(&key).unwrap();
     add_round_key(&mut state, &ekey[0..16]);
     for round in 1..10 {
         sub_bytes(&mut state);
@@ -185,20 +213,10 @@ fn mix_columns(state: &mut [u8; 16]) {
         state[4*i+3] = gf_multiply(3, b0) ^ b1 ^ b2 ^ gf_multiply(2, b3);
     }
 }
-#[test]
-fn encrypt_test() {
-    let plain = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff];
-    let key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
-    let expected = [0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30, 0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a];
-    let actual = encrypt_128(key, plain);
-    assert_eq!(expected, actual);
-    let reverse = decrypt_128(key, expected);
-    assert_eq!(plain, reverse);
-}
  
 pub fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     let mut state = block;
-    let ekey = expand_key_128(key);
+    let ekey = expand_key(&key).unwrap();
     add_round_key(&mut state, &ekey[10*16 .. 11*16]);
     for round in (1..10).rev() {
         inv_shift_rows(&mut state);
@@ -210,6 +228,12 @@ pub fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     inv_sub_bytes(&mut state);
     add_round_key(&mut state, &ekey[0..16]);
     state
+}
+
+fn inv_sub_bytes(state: &mut [u8; 16]) {
+    for i in 0..16 {
+        state[i] = INVBOX[state[i] as usize];
+    }
 }
 
 fn inv_shift_rows(state: &mut [u8; 16]) {
@@ -235,8 +259,14 @@ fn inv_mix_columns(state: &mut [u8; 16]) {
     }
 }
 
-fn inv_sub_bytes(state: &mut [u8; 16]) {
-    for i in 0..16 {
-        state[i] = INVBOX[state[i] as usize];
-    }
+
+#[test]
+fn encrypt_test() {
+    let plain = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff];
+    let key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
+    let expected = [0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30, 0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a];
+    let actual = encrypt_128(key, plain);
+    assert_eq!(expected, actual);
+    let reverse = decrypt_128(key, expected);
+    assert_eq!(plain, reverse);
 }
