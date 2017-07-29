@@ -163,11 +163,21 @@ fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
 }
 
 
-pub fn encrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
+pub fn encrypt(key: &[u8], block: [u8; 16]) ->  Result<[u8; 16], &'static str> {
     let mut state = block;
-    let ekey = expand_key(&key).unwrap();
+    let ekey = match key.len() {
+        16 | 24 | 32 => return encrypt(&expand_key(key).unwrap()[..], block),
+        176 | 208 | 240 => key,
+        _ => return Err("Invalid key size"),
+    };
+    let rounds = match ekey.len() {
+        176 => 10,
+        208 => 12,
+        240 => 14,
+        _ => panic!("Key expansion returned invalid size"),
+    };
     add_round_key(&mut state, &ekey[0..16]);
-    for round in 1..10 {
+    for round in 1..rounds {
         sub_bytes(&mut state);
         shift_rows(&mut state);
         mix_columns(&mut state);
@@ -175,8 +185,8 @@ pub fn encrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     }
     sub_bytes(&mut state);
     shift_rows(&mut state);
-    add_round_key(&mut state, &ekey[10*16 .. 11*16]);
-    state
+    add_round_key(&mut state, &ekey[rounds*16 .. (rounds+1)*16]);
+    Ok(state)
 }
 
 fn add_round_key(state: &mut [u8; 16], round_key: &[u8]) {
@@ -214,11 +224,21 @@ fn mix_columns(state: &mut [u8; 16]) {
     }
 }
  
-pub fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
+pub fn decrypt(key: &[u8], block: [u8; 16]) -> Result<[u8; 16], &'static str> {
     let mut state = block;
-    let ekey = expand_key(&key).unwrap();
-    add_round_key(&mut state, &ekey[10*16 .. 11*16]);
-    for round in (1..10).rev() {
+    let ekey = match key.len() {
+        16 | 24 | 32 => return decrypt(&expand_key(key).unwrap()[..], block),
+        176 | 208 | 240 => key,
+        _ => return Err("Invalid key size"),
+    };
+    let rounds = match ekey.len() {
+        176 => 10,
+        208 => 12,
+        240 => 14,
+        _ => panic!("Key expansion returned invalid size"),
+    };
+    add_round_key(&mut state, &ekey[rounds*16 .. (rounds+1)*16]);
+    for round in (1..rounds).rev() {
         inv_shift_rows(&mut state);
         inv_sub_bytes(&mut state);
         add_round_key(&mut state, &ekey[round*16 .. (round+1) * 16]);
@@ -227,7 +247,7 @@ pub fn decrypt_128(key: [u8; 16], block: [u8; 16]) -> [u8; 16] {
     inv_shift_rows(&mut state);
     inv_sub_bytes(&mut state);
     add_round_key(&mut state, &ekey[0..16]);
-    state
+    Ok(state)
 }
 
 fn inv_sub_bytes(state: &mut [u8; 16]) {
@@ -265,8 +285,8 @@ fn encrypt_test() {
     let plain = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff];
     let key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
     let expected = [0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30, 0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a];
-    let actual = encrypt_128(key, plain);
+    let actual = encrypt(&key[..], plain).unwrap();
     assert_eq!(expected, actual);
-    let reverse = decrypt_128(key, expected);
+    let reverse = decrypt(&key, expected).unwrap();
     assert_eq!(plain, reverse);
 }
