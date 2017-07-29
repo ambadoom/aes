@@ -165,8 +165,11 @@ pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
 }
 
 
-pub fn encrypt(key: &[u8], block: [u8; 16]) ->  Result<[u8; 16], &'static str> {
-    let mut state = block;
+pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], &'static str> {
+    let mut state = [0; 16];
+    for i in 0..16 {
+        state[i] = block[i];
+    }
     let ekey = match key.len() {
         16 | 24 | 32 => return encrypt(&expand_key(key).unwrap()[..], block),
         176 | 208 | 240 => key,
@@ -226,8 +229,11 @@ fn mix_columns(state: &mut [u8; 16]) {
     }
 }
  
-pub fn decrypt(key: &[u8], block: [u8; 16]) -> Result<[u8; 16], &'static str> {
-    let mut state = block;
+pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], &'static str> {
+    let mut state = [0; 16];
+    for i in 0..16 {
+        state[i] = block[i];
+    }
     let ekey = match key.len() {
         16 | 24 | 32 => return decrypt(&expand_key(key).unwrap()[..], block),
         176 | 208 | 240 => key,
