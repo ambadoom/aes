@@ -166,6 +166,9 @@ pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
 
 
 pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], &'static str> {
+    if block.len() != 16 {
+        return Err("Invalid block size");
+    }
     let mut state = [0; 16];
     for i in 0..16 {
         state[i] = block[i];
@@ -230,6 +233,9 @@ fn mix_columns(state: &mut [u8; 16]) {
 }
  
 pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], &'static str> {
+    if block.len() != 16 {
+        return Err("Invalid block size");
+    }
     let mut state = [0; 16];
     for i in 0..16 {
         state[i] = block[i];
