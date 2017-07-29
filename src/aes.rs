@@ -110,7 +110,7 @@ fn schedule_core(bytes: &mut [u8; 4], iterations: u8) {
     bytes[0] ^= rcon; 
 }
     
-fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
+pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
     let insize = key.len();
     let outsize = match insize {
         16 => 176,
