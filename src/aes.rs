@@ -116,6 +116,7 @@ pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, String> {
         16 => 176,
         24 => 208,
         32 => 240,
+        176 | 208 | 240 => return Ok(key.to_vec()),
         _  => return Err("Invalid key size".to_string()),
     };
     let mut tmp = [0; 4];
@@ -173,11 +174,7 @@ pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], String> {
     for i in 0..16 {
         state[i] = block[i];
     }
-    let ekey = match key.len() {
-        16 | 24 | 32 => return encrypt(&expand_key(key).unwrap()[..], block),
-        176 | 208 | 240 => key,
-        _ => return Err("Invalid key size".to_string()),
-    };
+    let ekey = expand_key(key)?;
     let rounds = match ekey.len() {
         176 => 10,
         208 => 12,
@@ -240,11 +237,7 @@ pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], String> {
     for i in 0..16 {
         state[i] = block[i];
     }
-    let ekey = match key.len() {
-        16 | 24 | 32 => return decrypt(&expand_key(key).unwrap()[..], block),
-        176 | 208 | 240 => key,
-        _ => return Err("Invalid key size".to_string()),
-    };
+    let ekey = expand_key(key)?;
     let rounds = match ekey.len() {
         176 => 10,
         208 => 12,
