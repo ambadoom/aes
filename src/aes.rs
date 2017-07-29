@@ -110,13 +110,13 @@ fn schedule_core(bytes: &mut [u8; 4], iterations: u8) {
     bytes[0] ^= rcon; 
 }
     
-pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
+pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, String> {
     let insize = key.len();
     let outsize = match insize {
         16 => 176,
         24 => 208,
         32 => 240,
-        _  => return Err("Invalid key size"),
+        _  => return Err("Invalid key size".to_string()),
     };
     let mut tmp = [0; 4];
     let mut iterations = 1;
@@ -165,9 +165,9 @@ pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, &str> {
 }
 
 
-pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], &'static str> {
+pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], String> {
     if block.len() != 16 {
-        return Err("Invalid block size");
+        return Err("Invalid block size".to_string());
     }
     let mut state = [0; 16];
     for i in 0..16 {
@@ -176,7 +176,7 @@ pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], &'static str> {
     let ekey = match key.len() {
         16 | 24 | 32 => return encrypt(&expand_key(key).unwrap()[..], block),
         176 | 208 | 240 => key,
-        _ => return Err("Invalid key size"),
+        _ => return Err("Invalid key size".to_string()),
     };
     let rounds = match ekey.len() {
         176 => 10,
@@ -232,9 +232,9 @@ fn mix_columns(state: &mut [u8; 16]) {
     }
 }
  
-pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], &'static str> {
+pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], String> {
     if block.len() != 16 {
-        return Err("Invalid block size");
+        return Err("Invalid block size".to_string());
     }
     let mut state = [0; 16];
     for i in 0..16 {
@@ -243,7 +243,7 @@ pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], &'static str> {
     let ekey = match key.len() {
         16 | 24 | 32 => return decrypt(&expand_key(key).unwrap()[..], block),
         176 | 208 | 240 => key,
-        _ => return Err("Invalid key size"),
+        _ => return Err("Invalid key size".to_string()),
     };
     let rounds = match ekey.len() {
         176 => 10,
