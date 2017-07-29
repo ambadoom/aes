@@ -110,14 +110,14 @@ fn schedule_core(bytes: &mut [u8; 4], iterations: u8) {
     bytes[0] ^= rcon; 
 }
     
-pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, String> {
+pub fn expand_key(key: &[u8]) -> Vec<u8> {
     let insize = key.len();
     let outsize = match insize {
         16 => 176,
         24 => 208,
         32 => 240,
-        176 | 208 | 240 => return Ok(key.to_vec()),
-        _  => return Err("Invalid key size".to_string()),
+        176 | 208 | 240 => return key.to_vec(),
+        _  => panic!("Invalid key size"),
     };
     let mut tmp = [0; 4];
     let mut iterations = 1;
@@ -162,19 +162,19 @@ pub fn expand_key(key: &[u8]) -> Result<Vec<u8>, String> {
         }
     }
     expanded.truncate(outsize);
-    Ok(expanded)
+    expanded
 }
 
 
-pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], String> {
+pub fn encrypt(key: &[u8], block: &[u8]) ->  [u8; 16] {
     if block.len() != 16 {
-        return Err("Invalid block size".to_string());
+        panic!("Invalid block size");
     }
     let mut state = [0; 16];
     for i in 0..16 {
         state[i] = block[i];
     }
-    let ekey = expand_key(key)?;
+    let ekey = expand_key(key);
     let rounds = match ekey.len() {
         176 => 10,
         208 => 12,
@@ -191,7 +191,7 @@ pub fn encrypt(key: &[u8], block: &[u8]) ->  Result<[u8; 16], String> {
     sub_bytes(&mut state);
     shift_rows(&mut state);
     add_round_key(&mut state, &ekey[rounds*16 .. (rounds+1)*16]);
-    Ok(state)
+    state
 }
 
 fn add_round_key(state: &mut [u8; 16], round_key: &[u8]) {
@@ -229,15 +229,15 @@ fn mix_columns(state: &mut [u8; 16]) {
     }
 }
  
-pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], String> {
+pub fn decrypt(key: &[u8], block: &[u8]) -> [u8; 16] {
     if block.len() != 16 {
-        return Err("Invalid block size".to_string());
+        panic!("Invalid block size");
     }
     let mut state = [0; 16];
     for i in 0..16 {
         state[i] = block[i];
     }
-    let ekey = expand_key(key)?;
+    let ekey = expand_key(key);
     let rounds = match ekey.len() {
         176 => 10,
         208 => 12,
@@ -254,7 +254,7 @@ pub fn decrypt(key: &[u8], block: &[u8]) -> Result<[u8; 16], String> {
     inv_shift_rows(&mut state);
     inv_sub_bytes(&mut state);
     add_round_key(&mut state, &ekey[0..16]);
-    Ok(state)
+    state
 }
 
 fn inv_sub_bytes(state: &mut [u8; 16]) {
@@ -291,9 +291,9 @@ fn encrypt_test_128() {
     let plain = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff];
     let key = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
     let expected = [0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30, 0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a];
-    let actual = encrypt(&key, &plain).unwrap();
+    let actual = encrypt(&key, &plain);
     assert_eq!(expected, actual);
-    let reverse = decrypt(&key, &expected).unwrap();
+    let reverse = decrypt(&key, &expected);
     assert_eq!(plain, reverse);
 }
 
@@ -304,9 +304,9 @@ fn encrypt_test_192() {
         [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
         ,0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
     let expected = [0xdd, 0xa9, 0x7c, 0xa4, 0x86, 0x4c, 0xdf, 0xe0, 0x6e, 0xaf, 0x70, 0xa0, 0xec, 0x0d, 0x71, 0x91];
-    let actual = encrypt(&key, &plain).unwrap();
+    let actual = encrypt(&key, &plain);
     assert_eq!(expected, actual);
-    let reverse = decrypt(&key, &expected).unwrap();
+    let reverse = decrypt(&key, &expected);
     assert_eq!(plain, reverse);
 }
 
@@ -317,8 +317,8 @@ fn encrypt_test_256() {
         [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
         ,0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f];
     let expected = [0x8e, 0xa2, 0xb7, 0xca, 0x51, 0x67, 0x45, 0xbf, 0xea, 0xfc, 0x49, 0x90, 0x4b, 0x49, 0x60, 0x89]; 
-    let actual = encrypt(&key, &plain).unwrap();
+    let actual = encrypt(&key, &plain);
     assert_eq!(expected, actual);
-    let reverse = decrypt(&key, &expected).unwrap();
+    let reverse = decrypt(&key, &expected);
     assert_eq!(plain, reverse);
 }

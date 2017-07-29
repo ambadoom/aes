@@ -1,29 +1,29 @@
 pub mod aes;
 
-pub fn ecb_encrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
-    let ekey = aes::expand_key(key)?;
+pub fn ecb_encrypt(key: &[u8], data: &[u8]) -> Vec<u8> {
+    let ekey = aes::expand_key(key);
     let mut output = Vec::new();
     for block in data.chunks(16) {
         if block.len() != 16 {
-            return Err("Size must be multiple of 16 bytes".to_string());
+            panic!("Size must be multiple of 16 bytes");
         }
-        let encrypted = try!(aes::encrypt(&ekey, block));
+        let encrypted = aes::encrypt(&ekey, block);
         output.extend(encrypted.iter().cloned());
     }
-    Ok(output)
+    output
 }
 
 
-pub fn ecb_decrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
-    let ekey = aes::expand_key(key)?;
+pub fn ecb_decrypt(key: &[u8], data: &[u8]) -> Vec<u8> {
+    let ekey = aes::expand_key(key);
     let mut output = Vec::new();
     for block in data.chunks(16) {
         if block.len() != 16 {
-            return Err("Size must be multiple of 16 bytes".to_string());
+            panic!("Size must be multiple of 16 bytes");
         }
-        let decrypted = try!(aes::decrypt(&ekey, block));
+        let decrypted = aes::decrypt(&ekey, block);
         output.extend(decrypted.iter().cloned());
     }
-    Ok(output)
+    output
 }
 
