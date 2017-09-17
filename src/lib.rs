@@ -22,6 +22,15 @@ pub fn ecb_decrypt(key: &[u8], data: &[u8]) -> Vec<u8> {
     output
 }
 
+#[test]
+fn ecb_test() {
+    let data = [1; 128];
+    let key = [2; 16];
+    let encrypted = ecb_encrypt(&key, &data);
+    let decrypted = ecb_decrypt(&key, &encrypted);
+    assert_eq!(&data[..], &decrypted[..]);
+}
+
 pub fn cbc_encrypt(key: &[u8], data: &[u8], iv: &[u8]) -> Vec<u8> {
     let ekey = aes::expand_key(key);
     let mut output = Vec::new();
@@ -56,4 +65,13 @@ pub fn cbc_decrypt(key: &[u8], data: &[u8], iv: &[u8]) -> Vec<u8> {
     output
 }
 
+#[test]
+fn cbc_test() {
+    let data = [3; 128];
+    let key = [4; 16];
+    let iv = [5; 16];
+    let encrypted = cbc_encrypt(&key, &data, &iv);
+    let decrypted = cbc_decrypt(&key, &encrypted, &iv);
+    assert_eq!(&data[..], &decrypted[..]);
+}
 
