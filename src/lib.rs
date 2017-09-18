@@ -75,3 +75,25 @@ fn cbc_test() {
     assert_eq!(&data[..], &decrypted[..]);
 }
 
+pub fn pad(data: &[u8]) -> Vec<u8> {
+    let length = data.len();
+    let target = length - length % 16 + 16;
+    let padding = target - length;
+    let mut output = data.to_vec();
+    for _ in 0..padding {
+        output.push(padding as u8);
+    }
+    output
+}
+
+#[test]
+fn pad_test() {
+    let data = [7;11];
+    let padded = pad(&data);
+    assert_eq!([7,7,7,7,7,7,7,7,7,7,7,5,5,5,5,5], padded[..]);
+    let data2 = [4;16];
+    let padded2 = pad(&data2);
+    assert_eq!([4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16], padded2[..]);
+    // ^ allowing for no padding at all creates ambiguity if the unpadded data has an ending that
+    // looks like it could be padding so we pad for a full block
+}
