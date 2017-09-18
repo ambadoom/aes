@@ -86,6 +86,16 @@ pub fn pad(data: &[u8]) -> Vec<u8> {
     output
 }
 
+pub fn unpad(padded: &[u8]) -> Vec<u8> {
+    let last = padded[padded.len() - 1];
+    let mut output = padded.to_vec();
+    while output[output.len() - 1] == last {
+        let end = output.len() -1;
+        output.remove(end);
+    }
+    output
+}
+
 #[test]
 fn pad_test() {
     let data = [7;11];
@@ -96,4 +106,8 @@ fn pad_test() {
     assert_eq!([4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16], padded2[..]);
     // ^ allowing for no padding at all creates ambiguity if the unpadded data has an ending that
     // looks like it could be padding so we pad for a full block
+    assert_eq!(data, unpad(&padded)[..]);
+    assert_eq!(data2, unpad(&padded2)[..]);
 }
+
+
