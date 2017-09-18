@@ -76,9 +76,7 @@ fn cbc_test() {
 }
 
 pub fn pad(data: &[u8]) -> Vec<u8> {
-    let length = data.len();
-    let target = length - length % 16 + 16;
-    let padding = target - length;
+    let padding = 16 - data.len() % 16;
     let mut output = data.to_vec();
     for _ in 0..padding {
         output.push(padding as u8);
@@ -87,13 +85,22 @@ pub fn pad(data: &[u8]) -> Vec<u8> {
 }
 
 pub fn unpad(padded: &[u8]) -> Vec<u8> {
-    let last = padded[padded.len() - 1];
+    let last = padded.last();
     let mut output = padded.to_vec();
-    while output[output.len() - 1] == last {
-        let end = output.len() -1;
-        output.remove(end);
+    while output.last() == last {
+        output.pop();
     }
     output
+}
+
+pub fn check_padding(padded: &[u8]) -> bool {
+    let last = padded.last();
+    let mut i = padded.len() - 1;
+    while Some(&padded[i]) == last && i > 0 {
+        i -= 1;
+    }
+    let count = (padded.len() - i - 1) as u8;
+    return Some(&count) == last;
 }
 
 #[test]
@@ -108,6 +115,7 @@ fn pad_test() {
     // looks like it could be padding so we pad for a full block
     assert_eq!(data, unpad(&padded)[..]);
     assert_eq!(data2, unpad(&padded2)[..]);
+    assert!(check_padding(&padded));
+    assert!(check_padding(&padded2));
 }
-
 
